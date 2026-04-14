@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="NPC Actor System — Admin Dashboard for managing AI-directed NPC actors at live events">
+    <title>NPC Actor System — Command Center</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🎭</text></svg>">
+</head>
+<body>
+    <div class="app-container" id="app">
+        <!-- Header -->
+        <header class="app-header" role="banner">
+            <div class="app-logo">
+                <div class="app-logo-icon" aria-hidden="true">🎭</div>
+                <span class="app-logo-text">NPC Actor System</span>
+            </div>
+            <nav class="app-nav" role="navigation" aria-label="Main navigation">
+                <a href="/" class="active" id="nav-dashboard">📊 Dashboard</a>
+                <a href="/actor" id="nav-actor">🎧 Actor Earpiece</a>
+                <a href="/scanner" id="nav-scanner">📡 Badge Scanner</a>
+            </nav>
+        </header>
+
+        <!-- Stats -->
+        <section class="stats-grid" aria-label="System statistics">
+            <div class="stat-card indigo">
+                <div class="stat-label">Attendees</div>
+                <div class="stat-value" id="stat-attendees">—</div>
+            </div>
+            <div class="stat-card cyan">
+                <div class="stat-label">NPC Characters</div>
+                <div class="stat-value" id="stat-characters">—</div>
+            </div>
+            <div class="stat-card emerald">
+                <div class="stat-label">Interactions</div>
+                <div class="stat-value" id="stat-interactions">—</div>
+            </div>
+            <div class="stat-card amber">
+                <div class="stat-label">Actors Online</div>
+                <div class="stat-value" id="stat-actors">—</div>
+            </div>
+        </section>
+
+        <!-- Main Grid -->
+        <div class="grid-2" style="margin-bottom: 24px;">
+            <!-- Attendees Panel -->
+            <div class="card" id="attendees-panel">
+                <div class="card-header">
+                    <h2 class="card-title"><span class="icon">👥</span> Attendees</h2>
+                    <button class="btn btn-primary btn-sm" id="btn-add-attendee" aria-label="Add new attendee">
+                        + Add
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table id="attendees-table" aria-label="Registered attendees">
+                        <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Badge</th>
+                                <th scope="col">Interests</th>
+                                <th scope="col">XP</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendees-tbody">
+                            <tr><td colspan="5" class="empty-state">
+                                <div class="spinner"></div>
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Characters Panel -->
+            <div class="card" id="characters-panel">
+                <div class="card-header">
+                    <h2 class="card-title"><span class="icon">🎭</span> NPC Characters</h2>
+                    <button class="btn btn-primary btn-sm" id="btn-add-character" aria-label="Add new character">
+                        + Add
+                    </button>
+                </div>
+                <div id="characters-list">
+                    <div class="loading-screen"><div class="spinner"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactions Log -->
+        <div class="card" id="interactions-panel">
+            <div class="card-header">
+                <h2 class="card-title"><span class="icon">📜</span> Live Interactions</h2>
+                <button class="btn btn-sm" id="btn-refresh-interactions" aria-label="Refresh interactions">
+                    🔄 Refresh
+                </button>
+            </div>
+            <div id="interactions-list">
+                <div class="empty-state">
+                    <div class="icon">📡</div>
+                    <div class="title">No interactions yet</div>
+                    <div class="description">Scan a badge to generate NPC dialogue</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Attendee Modal -->
+    <div class="modal-overlay" id="modal-attendee" role="dialog" aria-labelledby="modal-attendee-title" aria-modal="true">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-attendee-title">Add Attendee</h3>
+                <button class="modal-close" aria-label="Close modal">&times;</button>
+            </div>
+            <form id="form-attendee" novalidate>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="att-name">Name *</label>
+                        <input class="form-input" id="att-name" name="name" required placeholder="e.g. Priya Sharma">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="att-badge">Badge ID *</label>
+                        <input class="form-input" id="att-badge" name="badge_id" required placeholder="e.g. NFC-2001">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="att-email">Email</label>
+                        <input class="form-input" id="att-email" name="email" type="email" placeholder="email@company.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="att-company">Company</label>
+                        <input class="form-input" id="att-company" name="company" placeholder="Company name">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="att-role">Role</label>
+                    <input class="form-input" id="att-role" name="role" placeholder="e.g. Software Engineer">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="att-interests">Interests (comma-separated)</label>
+                    <input class="form-input" id="att-interests" name="interests" placeholder="e.g. machine learning, python, cloud">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="att-sessions">Sessions Attended (comma-separated)</label>
+                    <input class="form-input" id="att-sessions" name="sessions_attended" placeholder="e.g. Keynote, Python Workshop">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Attendee</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Character Modal -->
+    <div class="modal-overlay" id="modal-character" role="dialog" aria-labelledby="modal-character-title" aria-modal="true">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-character-title">Add NPC Character</h3>
+                <button class="modal-close" aria-label="Close modal">&times;</button>
+            </div>
+            <form id="form-character" novalidate>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="char-name">Character Name *</label>
+                        <input class="form-input" id="char-name" name="name" required placeholder="e.g. Zephyr the Chronicler">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="char-archetype">Archetype</label>
+                        <select class="form-select" id="char-archetype" name="archetype">
+                            <option value="wizard">🧙 Wizard</option>
+                            <option value="oracle">🔮 Oracle</option>
+                            <option value="inventor">⚡ Inventor</option>
+                            <option value="historian">📚 Historian</option>
+                            <option value="trickster">🃏 Trickster</option>
+                            <option value="mentor">🎓 Mentor</option>
+                            <option value="custom">✨ Custom</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="char-prompt">Personality Prompt *</label>
+                    <textarea class="form-textarea" id="char-prompt" name="personality_prompt" required rows="4"
+                        placeholder="Define how this character speaks, behaves, and interacts..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="char-backstory">Backstory</label>
+                    <textarea class="form-textarea" id="char-backstory" name="backstory" rows="2"
+                        placeholder="Character's origin story..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="char-catchphrase">Catchphrase</label>
+                        <input class="form-input" id="char-catchphrase" name="catchphrase" placeholder="Their trademark line...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="char-actor">Assigned Actor</label>
+                        <input class="form-input" id="char-actor" name="assigned_actor" placeholder="e.g. Actor 5">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn modal-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Character</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <script src="/js/admin.js"></script>
+</body>
+</html>

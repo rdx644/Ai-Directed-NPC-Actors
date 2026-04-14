@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="NPC Actor System — NFC Badge Scanner Simulator for generating AI dialogue">
+    <title>NPC Actor System — Badge Scanner</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>📡</text></svg>">
+</head>
+<body>
+    <div class="app-container" id="app">
+        <!-- Header -->
+        <header class="app-header" role="banner">
+            <div class="app-logo">
+                <div class="app-logo-icon" aria-hidden="true">📡</div>
+                <span class="app-logo-text">Badge Scanner</span>
+            </div>
+            <nav class="app-nav" role="navigation" aria-label="Main navigation">
+                <a href="/" id="nav-dashboard">📊 Dashboard</a>
+                <a href="/actor" id="nav-actor">🎧 Actor Earpiece</a>
+                <a href="/scanner" class="active" id="nav-scanner">📡 Badge Scanner</a>
+            </nav>
+        </header>
+
+        <div class="scanner-layout">
+            <!-- Left: Scanner Controls -->
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+                <!-- Scan Zone -->
+                <div class="scan-zone" id="scan-zone" role="button" tabindex="0" aria-label="Tap to simulate badge scan">
+                    <div class="scan-icon" id="scan-icon">📡</div>
+                    <div class="scan-text" id="scan-text">Tap to Simulate Badge Scan</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 8px;">
+                        or select an attendee below
+                    </div>
+                </div>
+
+                <!-- Configuration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title"><span class="icon">⚙️</span> Scan Configuration</h3>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="scan-attendee">Select Attendee</label>
+                        <select class="form-select" id="scan-attendee" aria-label="Choose attendee to scan">
+                            <option value="">Loading attendees...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="scan-character">NPC Character</label>
+                        <select class="form-select" id="scan-character" aria-label="Choose NPC character">
+                            <option value="">Loading characters...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="scan-interaction">Interaction Type</label>
+                        <select class="form-select" id="scan-interaction" aria-label="Choose interaction type">
+                            <option value="greeting">👋 Greeting</option>
+                            <option value="quest">⚔️ Quest Assignment</option>
+                            <option value="advice">💡 Advice</option>
+                            <option value="riddle">🧩 Riddle</option>
+                            <option value="lore">📖 Lore / Story</option>
+                            <option value="farewell">🌟 Farewell</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="scan-context">Custom Context (optional)</label>
+                        <input class="form-input" id="scan-context" placeholder="e.g. attendee just won a hackathon"
+                            aria-label="Additional context for AI dialogue">
+                    </div>
+                    <button class="btn btn-primary" id="btn-scan" style="width: 100%; justify-content: center; padding: 14px;">
+                        📡 Generate NPC Dialogue
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right: Results & History -->
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+                <!-- Current Dialogue Result -->
+                <div class="card" id="result-card">
+                    <div class="card-header">
+                        <h3 class="card-title"><span class="icon">💬</span> Generated Dialogue</h3>
+                        <span class="badge badge-indigo" id="result-type">—</span>
+                    </div>
+                    <div id="result-content">
+                        <div class="empty-state">
+                            <div class="icon">🎭</div>
+                            <div class="title">No dialogue generated yet</div>
+                            <div class="description">Select an attendee and character, then scan to see AI-generated NPC dialogue</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Attendee Preview -->
+                <div class="card" id="attendee-preview-card" style="display: none;">
+                    <div class="card-header">
+                        <h3 class="card-title"><span class="icon">👤</span> Attendee Profile</h3>
+                    </div>
+                    <div id="attendee-preview">
+                    </div>
+                </div>
+
+                <!-- Scan History -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title"><span class="icon">📜</span> Scan History</h3>
+                        <button class="btn btn-sm" id="btn-clear-history">Clear</button>
+                    </div>
+                    <div id="scan-history">
+                        <div class="empty-state">
+                            <div class="icon">📝</div>
+                            <div class="title">No scans yet</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <script src="/js/scanner.js"></script>
+</body>
+</html>
