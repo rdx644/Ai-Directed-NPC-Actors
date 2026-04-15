@@ -16,7 +16,6 @@ import logging
 import time
 import uuid
 from collections import defaultdict
-from typing import Callable
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
@@ -32,6 +31,7 @@ logger = logging.getLogger("npc-system.middleware")
 #  Security Headers Middleware
 # ──────────────────────────────────────────────
 
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
     Injects OWASP-recommended security headers into every HTTP response.
@@ -46,9 +46,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
       - Permissions-Policy: restricts browser feature access
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
 
         # Core security headers
@@ -83,6 +81,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 # ──────────────────────────────────────────────
 #  Rate Limiting Middleware (Token Bucket)
 # ──────────────────────────────────────────────
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
@@ -135,9 +134,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._buckets[ip] = (tokens, now)
         return False
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Skip rate limiting for health checks and static files
         path = request.url.path
         if path in ("/api/health",) or path.startswith(("/css/", "/js/")):
@@ -165,6 +162,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 #  Request Logging Middleware
 # ──────────────────────────────────────────────
 
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """
     Structured request/response logging with correlation IDs.
@@ -175,9 +173,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
       - Unique request ID for correlation
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Skip logging for static files
         path = request.url.path
         if path.startswith(("/css/", "/js/")):
@@ -221,6 +217,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 #  Global Error Handler Middleware
 # ──────────────────────────────────────────────
 
+
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     """
     Global exception handler that returns safe, structured error responses.
@@ -229,9 +226,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     Logs full error details server-side for debugging.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         try:
             return await call_next(request)
         except Exception as exc:
@@ -255,6 +250,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
 # ──────────────────────────────────────────────
 #  Middleware Registration
 # ──────────────────────────────────────────────
+
 
 def register_middleware(app: FastAPI) -> None:
     """

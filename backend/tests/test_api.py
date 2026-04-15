@@ -201,11 +201,14 @@ class TestScanEndpoint:
         attendees = client.get("/api/attendees").json()
         characters = client.get("/api/characters").json()
         if attendees and characters:
-            res = client.post("/api/scan", json={
-                "badge_id": attendees[0]["badge_id"],
-                "character_id": characters[0]["id"],
-                "interaction_type": "greeting",
-            })
+            res = client.post(
+                "/api/scan",
+                json={
+                    "badge_id": attendees[0]["badge_id"],
+                    "character_id": characters[0]["id"],
+                    "interaction_type": "greeting",
+                },
+            )
             assert res.status_code == 200
             data = res.json()
             assert "dialogue" in data
@@ -215,19 +218,25 @@ class TestScanEndpoint:
     def test_scan_invalid_badge_returns_404(self, client: TestClient) -> None:
         characters = client.get("/api/characters").json()
         if characters:
-            res = client.post("/api/scan", json={
-                "badge_id": "INVALID-BADGE",
-                "character_id": characters[0]["id"],
-            })
+            res = client.post(
+                "/api/scan",
+                json={
+                    "badge_id": "INVALID-BADGE",
+                    "character_id": characters[0]["id"],
+                },
+            )
             assert res.status_code == 404
 
     def test_scan_invalid_character_returns_404(self, client: TestClient) -> None:
         attendees = client.get("/api/attendees").json()
         if attendees:
-            res = client.post("/api/scan", json={
-                "badge_id": attendees[0]["badge_id"],
-                "character_id": "invalid-char-id",
-            })
+            res = client.post(
+                "/api/scan",
+                json={
+                    "badge_id": attendees[0]["badge_id"],
+                    "character_id": "invalid-char-id",
+                },
+            )
             assert res.status_code == 404
 
     def test_scan_all_interaction_types(self, client: TestClient) -> None:
@@ -237,11 +246,14 @@ class TestScanEndpoint:
         types = ["greeting", "quest", "advice", "riddle", "lore", "farewell"]
         if attendees and characters:
             for itype in types:
-                res = client.post("/api/scan", json={
-                    "badge_id": attendees[0]["badge_id"],
-                    "character_id": characters[0]["id"],
-                    "interaction_type": itype,
-                })
+                res = client.post(
+                    "/api/scan",
+                    json={
+                        "badge_id": attendees[0]["badge_id"],
+                        "character_id": characters[0]["id"],
+                        "interaction_type": itype,
+                    },
+                )
                 assert res.status_code == 200, f"Failed for type: {itype}"
                 assert res.json()["interaction_type"] == itype
 
@@ -266,24 +278,19 @@ class TestWebSocket:
     def test_websocket_connect_valid(self, client: TestClient) -> None:
         characters = client.get("/api/characters").json()
         if characters:
-            with client.websocket_connect(
-                f"/ws/actor/{characters[0]['id']}"
-            ) as ws:
+            with client.websocket_connect(f"/ws/actor/{characters[0]['id']}") as ws:
                 data = ws.receive_json()
                 assert data["type"] == "system"
                 assert characters[0]["name"] in data["character_name"]
 
     def test_websocket_connect_invalid_returns_close(self, client: TestClient) -> None:
-        with pytest.raises(Exception):
-            with client.websocket_connect("/ws/actor/invalid-id") as ws:
-                ws.receive_json()
+        with pytest.raises(Exception), client.websocket_connect("/ws/actor/invalid-id") as ws:  # noqa: B017
+            ws.receive_json()
 
     def test_websocket_ping_pong(self, client: TestClient) -> None:
         characters = client.get("/api/characters").json()
         if characters:
-            with client.websocket_connect(
-                f"/ws/actor/{characters[0]['id']}"
-            ) as ws:
+            with client.websocket_connect(f"/ws/actor/{characters[0]['id']}") as ws:
                 ws.receive_json()  # welcome
                 ws.send_text('{"command": "ping"}')
                 data = ws.receive_json()
@@ -292,9 +299,7 @@ class TestWebSocket:
     def test_websocket_status_command(self, client: TestClient) -> None:
         characters = client.get("/api/characters").json()
         if characters:
-            with client.websocket_connect(
-                f"/ws/actor/{characters[0]['id']}"
-            ) as ws:
+            with client.websocket_connect(f"/ws/actor/{characters[0]['id']}") as ws:
                 ws.receive_json()  # welcome
                 ws.send_text('{"command": "status"}')
                 data = ws.receive_json()

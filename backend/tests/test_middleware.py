@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
 from backend.middleware import RateLimitMiddleware
 
 
@@ -22,6 +20,7 @@ class TestRateLimitBucket:
         limiter.rate = 1.0  # 1 token/sec
         limiter.burst_size = 5
         from collections import defaultdict
+
         limiter._buckets = defaultdict(lambda: (5.0, time.monotonic()))
 
         # Should allow 5 burst requests
@@ -34,6 +33,7 @@ class TestRateLimitBucket:
         limiter.rate = 0.1  # very slow refill
         limiter.burst_size = 2
         from collections import defaultdict
+
         limiter._buckets = defaultdict(lambda: (2.0, time.monotonic()))
 
         assert limiter._consume_token("test-ip") is True
@@ -46,6 +46,7 @@ class TestRateLimitBucket:
         limiter.rate = 100.0  # 100 tokens/sec (fast refill for testing)
         limiter.burst_size = 5
         from collections import defaultdict
+
         limiter._buckets = defaultdict(lambda: (5.0, time.monotonic()))
 
         # Exhaust all tokens
@@ -64,6 +65,7 @@ class TestRateLimitBucket:
         limiter.rate = 0.1
         limiter.burst_size = 1
         from collections import defaultdict
+
         limiter._buckets = defaultdict(lambda: (1.0, time.monotonic()))
 
         assert limiter._consume_token("ip-1") is True
@@ -77,6 +79,7 @@ class TestRateLimitEndpoint:
     def test_rate_limit_returns_429(self) -> None:
         """Excessive requests should eventually return 429."""
         from fastapi.testclient import TestClient
+
         from backend.app import app
 
         with TestClient(app) as client:
@@ -90,7 +93,7 @@ class TestRateLimitEndpoint:
             # Note: depends on configured burst size
             if 429 in status_codes:
                 # If we got rate limited, verify the response format
-                for i, code in enumerate(status_codes):
+                for _i, code in enumerate(status_codes):
                     if code == 429:
                         # Re-do the request to check response body
                         res = client.get("/api/attendees")

@@ -10,12 +10,12 @@ from __future__ import annotations
 import pytest
 
 from backend.security import (
-    sanitize_string,
+    FIELD_LIMITS,
+    filter_generated_content,
     sanitize_list,
+    sanitize_string,
     validate_badge_id,
     validate_email,
-    filter_generated_content,
-    FIELD_LIMITS,
 )
 
 
@@ -33,7 +33,7 @@ class TestSanitizeString:
     def test_removes_null_bytes(self) -> None:
         result = sanitize_string("hello\x00world")
         assert "\x00" not in result
-        assert "helloworld" == result
+        assert result == "helloworld"
 
     def test_removes_control_characters(self) -> None:
         result = sanitize_string("hello\x01\x02world")
@@ -138,11 +138,11 @@ class TestFilterGeneratedContent:
         assert "<script" not in result
 
     def test_removes_javascript_protocol(self) -> None:
-        result = filter_generated_content('Click javascript:alert(1)')
+        result = filter_generated_content("Click javascript:alert(1)")
         assert "javascript:" not in result
 
     def test_removes_event_handlers(self) -> None:
-        result = filter_generated_content('Click onclick=alert(1)')
+        result = filter_generated_content("Click onclick=alert(1)")
         assert "onclick=" not in result
 
     def test_preserves_safe_content(self) -> None:
@@ -162,9 +162,17 @@ class TestFieldLimits:
     def test_all_fields_have_limits(self) -> None:
         """All expected fields should have defined limits."""
         expected = [
-            "name", "email", "badge_id", "company", "role",
-            "personality_prompt", "backstory", "catchphrase",
-            "custom_context", "context", "notes",
+            "name",
+            "email",
+            "badge_id",
+            "company",
+            "role",
+            "personality_prompt",
+            "backstory",
+            "catchphrase",
+            "custom_context",
+            "context",
+            "notes",
         ]
         for field in expected:
             assert field in FIELD_LIMITS, f"Missing limit for field: {field}"

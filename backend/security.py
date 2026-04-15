@@ -14,9 +14,8 @@ import html
 import logging
 import re
 import secrets
-from typing import Optional
 
-from fastapi import Depends, HTTPException, Security
+from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
 
 from backend.config import settings
@@ -76,9 +75,7 @@ def sanitize_string(value: str, field_name: str = "input") -> str:
     # Enforce length limit
     max_length = FIELD_LIMITS.get(field_name, 1000)
     if len(cleaned) > max_length:
-        raise ValueError(
-            f"Field '{field_name}' exceeds maximum length of {max_length} characters"
-        )
+        raise ValueError(f"Field '{field_name}' exceeds maximum length of {max_length} characters")
 
     # Escape HTML entities to prevent stored XSS
     cleaned = html.escape(cleaned, quote=True)
@@ -88,11 +85,7 @@ def sanitize_string(value: str, field_name: str = "input") -> str:
 
 def sanitize_list(values: list[str], field_name: str = "list_item") -> list[str]:
     """Sanitize a list of strings, filtering empty values."""
-    return [
-        sanitize_string(v, field_name)
-        for v in values
-        if v and v.strip()
-    ]
+    return [sanitize_string(v, field_name) for v in values if v and v.strip()]
 
 
 def validate_badge_id(badge_id: str) -> str:
@@ -128,9 +121,7 @@ def validate_email(email: str) -> str:
     Raises:
         ValueError: If the email format is invalid.
     """
-    email_pattern = re.compile(
-        r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
-    )
+    email_pattern = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
     if not email_pattern.match(email):
         raise ValueError("Invalid email address format")
     if len(email) > FIELD_LIMITS["email"]:
@@ -146,8 +137,8 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def verify_api_key(
-    api_key: Optional[str] = Security(api_key_header),
-) -> Optional[str]:
+    api_key: str | None = Security(api_key_header),
+) -> str | None:
     """
     Verify the API key for protected admin endpoints.
 

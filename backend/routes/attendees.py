@@ -14,11 +14,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 
 from backend.database import db
 from backend.models import Attendee, AttendeeCreate, AttendeeUpdate
-from backend.security import sanitize_string, sanitize_list, validate_badge_id, validate_email
+from backend.security import sanitize_list, sanitize_string, validate_badge_id, validate_email
 
 logger = logging.getLogger("npc-system.routes.attendees")
 
@@ -57,13 +57,12 @@ async def create_attendee(data: AttendeeCreate) -> dict[str, Any]:
             role=sanitize_string(data.role, "role") if data.role else None,
             interests=sanitize_list(data.interests, "interests") if data.interests else [],
             sessions_attended=(
-                sanitize_list(data.sessions_attended, "sessions")
-                if data.sessions_attended else []
+                sanitize_list(data.sessions_attended, "sessions") if data.sessions_attended else []
             ),
             notes=sanitize_string(data.notes, "notes") if data.notes else None,
         )
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     attendee = Attendee(**sanitized.model_dump())
     created = db.create_attendee(attendee)
@@ -77,13 +76,13 @@ async def update_attendee(attendee_id: str, data: AttendeeUpdate) -> dict[str, A
     update_data = data.model_dump(exclude_unset=True)
 
     # Sanitize provided fields
-    if "name" in update_data and update_data["name"]:
+    if update_data.get("name"):
         update_data["name"] = sanitize_string(update_data["name"], "name")
-    if "email" in update_data and update_data["email"]:
+    if update_data.get("email"):
         try:
             update_data["email"] = validate_email(update_data["email"])
         except ValueError as e:
-            raise HTTPException(status_code=422, detail=str(e))
+            raise HTTPException(status_code=422, detail=str(e)) from e
 
     updated = db.update_attendee(attendee_id, update_data)
     if not updated:

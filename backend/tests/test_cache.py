@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from backend.cache import LRUCache, CacheKey, CacheEntry
+from backend.cache import CacheEntry, CacheKey, LRUCache
 
 
 class TestCacheKey:

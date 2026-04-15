@@ -7,9 +7,9 @@ Web Speech API fallback.
 """
 
 from __future__ import annotations
+
 import base64
 import logging
-from typing import Optional
 
 from backend.config import settings
 
@@ -28,6 +28,7 @@ def _get_tts_client():
     if _tts_client is None and settings.use_google_tts:
         try:
             from google.cloud import texttospeech
+
             _tts_client = texttospeech.TextToSpeechClient()
             logger.info("Google Cloud TTS client initialized")
         except Exception as e:
@@ -41,7 +42,7 @@ async def synthesize_speech(
     voice_name: str = "en-US-Neural2-D",
     speaking_rate: float = 1.0,
     pitch: float = 0.0,
-) -> Optional[str]:
+) -> str | None:
     """
     Convert text to speech using Google Cloud TTS.
 
@@ -121,11 +122,13 @@ async def list_available_voices(language_code: str = "en-US") -> list[dict]:
         voices = []
         for voice in response.voices:
             if "Neural2" in voice.name or "Studio" in voice.name:
-                voices.append({
-                    "name": voice.name,
-                    "gender": texttospeech.SsmlVoiceGender(voice.ssml_gender).name,
-                    "description": f"{voice.name} ({texttospeech.SsmlVoiceGender(voice.ssml_gender).name})",
-                })
+                voices.append(
+                    {
+                        "name": voice.name,
+                        "gender": texttospeech.SsmlVoiceGender(voice.ssml_gender).name,
+                        "description": f"{voice.name} ({texttospeech.SsmlVoiceGender(voice.ssml_gender).name})",
+                    }
+                )
         return voices
     except Exception as e:
         logger.error(f"Failed to list voices: {e}")

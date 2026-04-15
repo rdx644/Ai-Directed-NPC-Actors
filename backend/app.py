@@ -24,9 +24,9 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,19 +39,21 @@ from backend.config import settings
 from backend.database import db
 from backend.middleware import register_middleware
 from backend.models import ActorCueMessage
+from backend.routes.attendees import router as attendees_router
+from backend.routes.characters import router as characters_router
+from backend.routes.scanner import router as scanner_router
 
 # ──────────────────────────────────────────────
 #  Structured Logging Configuration
 # ──────────────────────────────────────────────
+
 
 def _configure_logging() -> None:
     """Set up structured logging with appropriate level and format."""
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
     logging.basicConfig(
         level=log_level,
-        format=(
-            "%(asctime)s │ %(name)-28s │ %(levelname)-5s │ %(message)s"
-        ),
+        format=("%(asctime)s │ %(name)-28s │ %(levelname)-5s │ %(message)s"),
         datefmt="%Y-%m-%d %H:%M:%S",
         stream=sys.stdout,
         force=True,
@@ -68,6 +70,7 @@ logger = logging.getLogger("npc-system")
 # ──────────────────────────────────────────────
 #  WebSocket Connection Manager
 # ──────────────────────────────────────────────
+
 
 class ActorConnectionManager:
     """
@@ -129,9 +132,7 @@ class ActorConnectionManager:
 
     def get_connected_characters(self) -> list[str]:
         """Return list of character IDs with active WebSocket connections."""
-        return [
-            cid for cid, conns in self._connections.items() if conns
-        ]
+        return [cid for cid, conns in self._connections.items() if conns]
 
     @property
     def total_connections(self) -> int:
@@ -146,6 +147,7 @@ manager = ActorConnectionManager()
 # ──────────────────────────────────────────────
 #  Application Lifespan
 # ──────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -202,10 +204,6 @@ register_middleware(app)
 #  Route Registration
 # ──────────────────────────────────────────────
 
-from backend.routes.attendees import router as attendees_router
-from backend.routes.characters import router as characters_router
-from backend.routes.scanner import router as scanner_router
-
 app.include_router(attendees_router)
 app.include_router(characters_router)
 app.include_router(scanner_router)
@@ -214,6 +212,7 @@ app.include_router(scanner_router)
 # ──────────────────────────────────────────────
 #  Health & System Endpoints
 # ──────────────────────────────────────────────
+
 
 @app.get("/api/health", tags=["System"])
 async def health_check() -> dict:
@@ -246,6 +245,7 @@ async def get_event() -> dict:
 # ──────────────────────────────────────────────
 #  WebSocket: Actor Earpiece
 # ──────────────────────────────────────────────
+
 
 @app.websocket("/ws/actor/{character_id}")
 async def actor_websocket(websocket: WebSocket, character_id: str) -> None:
@@ -287,11 +287,13 @@ async def actor_websocket(websocket: WebSocket, character_id: str) -> None:
                     await websocket.send_json({"type": "pong"})
 
                 elif cmd == "status":
-                    await websocket.send_json({
-                        "type": "system",
-                        "dialogue": f"You are {character.name}. System is active.",
-                        "character_name": character.name,
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "system",
+                            "dialogue": f"You are {character.name}. System is active.",
+                            "character_name": character.name,
+                        }
+                    )
 
             except json.JSONDecodeError:
                 logger.debug(f"Non-JSON message from actor: {data[:50]}")

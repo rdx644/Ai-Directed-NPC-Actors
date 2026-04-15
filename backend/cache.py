@@ -20,7 +20,7 @@ import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger("npc-system.cache")
 
@@ -28,6 +28,7 @@ logger = logging.getLogger("npc-system.cache")
 @dataclass(frozen=True)
 class CacheKey:
     """Immutable, hashable cache key for dialogue requests."""
+
     character_id: str
     attendee_id: str
     interaction_type: str
@@ -41,6 +42,7 @@ class CacheKey:
 @dataclass
 class CacheEntry:
     """A cached value with creation timestamp for TTL expiry."""
+
     value: Any
     created_at: float = field(default_factory=time.monotonic)
 
@@ -68,7 +70,7 @@ class LRUCache:
         self._hits: int = 0
         self._misses: int = 0
 
-    def get(self, key: CacheKey) -> Optional[Any]:
+    def get(self, key: CacheKey) -> Any | None:
         """
         Retrieve a cached value if it exists and hasn't expired.
 

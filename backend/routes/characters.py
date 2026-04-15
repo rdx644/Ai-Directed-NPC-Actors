@@ -52,27 +52,20 @@ async def create_character(data: CharacterCreate) -> dict[str, Any]:
         sanitized = CharacterCreate(
             name=sanitize_string(data.name, "name"),
             archetype=data.archetype,
-            personality_prompt=sanitize_string(
-                data.personality_prompt, "personality_prompt"
-            ),
-            backstory=(
-                sanitize_string(data.backstory, "backstory")
-                if data.backstory else None
-            ),
+            personality_prompt=sanitize_string(data.personality_prompt, "personality_prompt"),
+            backstory=(sanitize_string(data.backstory, "backstory") if data.backstory else None),
             catchphrase=(
-                sanitize_string(data.catchphrase, "catchphrase")
-                if data.catchphrase else None
+                sanitize_string(data.catchphrase, "catchphrase") if data.catchphrase else None
             ),
             voice_style=data.voice_style,
             speaking_rate=data.speaking_rate,
             pitch=data.pitch,
             assigned_actor=(
-                sanitize_string(data.assigned_actor, "name")
-                if data.assigned_actor else None
+                sanitize_string(data.assigned_actor, "name") if data.assigned_actor else None
             ),
         )
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     character = Character(**sanitized.model_dump())
     created = db.create_character(character)
@@ -81,18 +74,14 @@ async def create_character(data: CharacterCreate) -> dict[str, Any]:
 
 
 @router.put("/{character_id}")
-async def update_character(
-    character_id: str, data: CharacterUpdate
-) -> dict[str, Any]:
+async def update_character(character_id: str, data: CharacterUpdate) -> dict[str, Any]:
     """Update an existing character with validated data."""
     update_data = data.model_dump(exclude_unset=True)
 
     # Sanitize provided text fields
     for field_name in ("name", "personality_prompt", "backstory", "catchphrase"):
-        if field_name in update_data and update_data[field_name]:
-            update_data[field_name] = sanitize_string(
-                update_data[field_name], field_name
-            )
+        if update_data.get(field_name):
+            update_data[field_name] = sanitize_string(update_data[field_name], field_name)
 
     updated = db.update_character(character_id, update_data)
     if not updated:

@@ -6,20 +6,18 @@ import pytest
 from pydantic import ValidationError
 
 from backend.models import (
+    ActorCueMessage,
     Attendee,
-    AttendeeCreate,
     AttendeeUpdate,
+    BadgeScanRequest,
     Character,
     CharacterArchetype,
-    CharacterCreate,
     CharacterUpdate,
-    InteractionType,
-    BadgeScanRequest,
-    EventSession,
-    EventConfig,
-    Interaction,
     DialogueResponse,
-    ActorCueMessage,
+    EventConfig,
+    EventSession,
+    Interaction,
+    InteractionType,
     MoreLinesRequest,
 )
 
@@ -39,10 +37,15 @@ class TestAttendeeModel:
     def test_create_full(self) -> None:
         """Attendee with all fields populated should succeed."""
         a = Attendee(
-            badge_id="NFC-002", name="Bob",
-            email="bob@test.com", company="TestCo", role="Dev",
-            interests=["python", "AI"], sessions_attended=["Keynote"],
-            xp_points=100, interaction_count=3,
+            badge_id="NFC-002",
+            name="Bob",
+            email="bob@test.com",
+            company="TestCo",
+            role="Dev",
+            interests=["python", "AI"],
+            sessions_attended=["Keynote"],
+            xp_points=100,
+            interaction_count=3,
         )
         assert a.company == "TestCo"
         assert len(a.interests) == 2
@@ -81,7 +84,8 @@ class TestAttendeeModel:
     def test_interests_validation(self) -> None:
         """Empty strings in interests should be filtered out."""
         a = Attendee(
-            badge_id="NFC-007", name="Test",
+            badge_id="NFC-007",
+            name="Test",
             interests=["python", "", "  ", "AI"],
         )
         # Empty items should be filtered by validator
@@ -213,8 +217,10 @@ class TestInteractionModel:
 
     def test_create_interaction(self) -> None:
         i = Interaction(
-            attendee_id="a1", attendee_name="Alice",
-            character_id="c1", character_name="Zephyr",
+            attendee_id="a1",
+            attendee_name="Alice",
+            character_id="c1",
+            character_name="Zephyr",
             interaction_type=InteractionType.QUEST,
             dialogue_generated="A quest for you!",
             quest_given="Find the hidden token",
@@ -252,10 +258,12 @@ class TestEventModels:
         assert e.event_name == "TechCon 3000"
 
     def test_event_with_sessions(self) -> None:
-        e = EventConfig(sessions=[
-            EventSession(title="Talk 1", speaker="Speaker 1"),
-            EventSession(title="Talk 2", speaker="Speaker 2"),
-        ])
+        e = EventConfig(
+            sessions=[
+                EventSession(title="Talk 1", speaker="Speaker 1"),
+                EventSession(title="Talk 2", speaker="Speaker 2"),
+            ]
+        )
         assert len(e.sessions) == 2
 
 

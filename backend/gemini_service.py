@@ -9,13 +9,11 @@ Generates contextual, in-character dialogue based on:
 """
 
 from __future__ import annotations
+
 import logging
-from typing import Optional
 
 from backend.config import settings
-from backend.models import (
-    Attendee, Character, EventConfig, InteractionType, DialogueResponse
-)
+from backend.models import Attendee, Character, DialogueResponse, EventConfig, InteractionType
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +30,7 @@ def _get_model():
     if _model is None:
         try:
             import google.generativeai as genai
+
             genai.configure(api_key=settings.gemini_api_key)
             _model = genai.GenerativeModel(
                 model_name="gemini-2.0-flash",
@@ -59,27 +58,27 @@ def _get_model():
 #  Prompt Engineering
 # ──────────────────────────────────────────────
 
+
 def _build_context_prompt(
     character: Character,
     attendee: Attendee,
     event: EventConfig,
     interaction_type: InteractionType,
-    custom_context: Optional[str] = None,
+    custom_context: str | None = None,
 ) -> str:
     """Build the complete prompt with full context for Gemini."""
 
     # Compile sessions the attendee hasn't visited yet (for quest suggestions)
     attended_titles = set(attendee.sessions_attended)
-    unattended = [
-        s for s in event.sessions
-        if s.title not in attended_titles
-    ]
+    unattended = [s for s in event.sessions if s.title not in attended_titles]
     unattended_info = "\n".join(
         f"  - '{s.title}' by {s.speaker} ({s.track}, {s.time_slot}, {s.room})"
         for s in unattended[:5]
     )
 
-    attended_info = ", ".join(attendee.sessions_attended) if attendee.sessions_attended else "none yet"
+    attended_info = (
+        ", ".join(attendee.sessions_attended) if attendee.sessions_attended else "none yet"
+    )
     interests_info = ", ".join(attendee.interests) if attendee.interests else "general technology"
 
     # Interaction-specific instructions
@@ -189,10 +188,11 @@ def _get_fallback_dialogue(
 ) -> str:
     """Generate fallback dialogue when Gemini API is unavailable."""
     import random
+
     templates = FALLBACK_DIALOGUES.get(
         interaction_type, FALLBACK_DIALOGUES[InteractionType.GREETING]
     )
-    template = random.choice(templates)
+    template = random.choice(templates)  # noqa: S311
     interest = attendee.interests[0] if attendee.interests else "technology"
     return template.format(name=attendee.name, interest=interest)
 
@@ -201,12 +201,13 @@ def _get_fallback_dialogue(
 #  Public API
 # ──────────────────────────────────────────────
 
+
 async def generate_dialogue(
     character: Character,
     attendee: Attendee,
     event: EventConfig,
     interaction_type: InteractionType = InteractionType.GREETING,
-    custom_context: Optional[str] = None,
+    custom_context: str | None = None,
 ) -> DialogueResponse:
     """
     Generate NPC dialogue using Google Gemini API.
@@ -242,7 +243,7 @@ async def generate_dialogue(
     # Extract quest if present
     if "QUEST:" in dialogue_text:
         lines = dialogue_text.split("\n")
-        quest_lines = [l for l in lines if l.strip().startswith("QUEST:")]
+        quest_lines = [line for line in lines if line.strip().startswith("QUEST:")]
         if quest_lines:
             quest_text = quest_lines[0].replace("QUEST:", "").strip()
 

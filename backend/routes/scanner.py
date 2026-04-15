@@ -10,7 +10,7 @@ Core business logic:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -139,11 +139,14 @@ async def _generate_and_deliver(
 
     # 10. Update attendee stats
     xp_gained = 50 if dialogue_response.quest else 10
-    db.update_attendee(attendee.id, {
-        "interaction_count": attendee.interaction_count + 1,
-        "last_scanned": datetime.now(timezone.utc),
-        "xp_points": attendee.xp_points + xp_gained,
-    })
+    db.update_attendee(
+        attendee.id,
+        {
+            "interaction_count": attendee.interaction_count + 1,
+            "last_scanned": datetime.now(UTC),
+            "xp_points": attendee.xp_points + xp_gained,
+        },
+    )
 
     # 11. Cache the response
     if use_cache and not custom_context:

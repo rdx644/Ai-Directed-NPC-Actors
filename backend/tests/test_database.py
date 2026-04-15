@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.database import InMemoryDatabase, DEMO_ATTENDEES, DEMO_CHARACTERS, DEMO_EVENT
+from backend.database import DEMO_ATTENDEES, DEMO_CHARACTERS, DEMO_EVENT, InMemoryDatabase
 from backend.models import Attendee, Character, Interaction, InteractionType
 
 
@@ -42,9 +42,7 @@ class TestDemoDataLoading:
     def test_demo_characters_have_prompts(self, fresh_db: InMemoryDatabase) -> None:
         """All demo characters should have personality prompts."""
         for char in fresh_db.list_characters():
-            assert len(char.personality_prompt) >= 10, (
-                f"{char.name} has too short a prompt"
-            )
+            assert len(char.personality_prompt) >= 10, f"{char.name} has too short a prompt"
 
 
 class TestAttendeeCRUD:
@@ -128,8 +126,10 @@ class TestInteractions:
 
     def test_add_interaction(self, fresh_db: InMemoryDatabase) -> None:
         interaction = Interaction(
-            attendee_id="a1", attendee_name="Alice",
-            character_id="c1", character_name="Zephyr",
+            attendee_id="a1",
+            attendee_name="Alice",
+            character_id="c1",
+            character_name="Zephyr",
             interaction_type=InteractionType.GREETING,
             dialogue_generated="Hello!",
         )
@@ -139,21 +139,29 @@ class TestInteractions:
     def test_list_interactions_sorted(self, fresh_db: InMemoryDatabase) -> None:
         """Interactions should be sorted newest first."""
         for i in range(5):
-            fresh_db.add_interaction(Interaction(
-                attendee_id=f"a{i}", attendee_name=f"User {i}",
-                character_id="c1", character_name="Zephyr",
-                dialogue_generated=f"Dialogue {i}",
-            ))
+            fresh_db.add_interaction(
+                Interaction(
+                    attendee_id=f"a{i}",
+                    attendee_name=f"User {i}",
+                    character_id="c1",
+                    character_name="Zephyr",
+                    dialogue_generated=f"Dialogue {i}",
+                )
+            )
         interactions = fresh_db.list_interactions(limit=3)
         assert len(interactions) == 3
 
     def test_list_interactions_limit(self, fresh_db: InMemoryDatabase) -> None:
         for i in range(10):
-            fresh_db.add_interaction(Interaction(
-                attendee_id=f"a{i}", attendee_name=f"User {i}",
-                character_id="c1", character_name="Zephyr",
-                dialogue_generated=f"Dialogue {i}",
-            ))
+            fresh_db.add_interaction(
+                Interaction(
+                    attendee_id=f"a{i}",
+                    attendee_name=f"User {i}",
+                    character_id="c1",
+                    character_name="Zephyr",
+                    dialogue_generated=f"Dialogue {i}",
+                )
+            )
         assert len(fresh_db.list_interactions(limit=5)) == 5
 
     def test_empty_interactions(self, fresh_db: InMemoryDatabase) -> None:
