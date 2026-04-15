@@ -1,14 +1,24 @@
 """
 Pydantic data models for the NPC Actor System.
-Defines schemas for Attendees, Characters, Events, Interactions, and API payloads.
+
+Defines strictly-typed schemas with field-level validation for:
+  - Attendees (event participants with NFC badges)
+  - Characters (AI-directed NPC personas)
+  - Events (schedule, sessions, tracks)
+  - Interactions (logged NPC-attendee encounters)
+  - API request/response payloads
+  - WebSocket message formats
 """
 
 from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+
 import uuid
+
+from pydantic import BaseModel, Field, field_validator
 
 
 # ──────────────────────────────────────────────
@@ -51,56 +61,64 @@ class QuestDifficulty(str, Enum):
 class Attendee(BaseModel):
     """Represents an event attendee identified by their NFC/RFID badge."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
-    badge_id: str = Field(..., description="Unique NFC/RFID badge identifier")
-    name: str
-    email: Optional[str] = None
-    company: Optional[str] = None
-    role: Optional[str] = None
-    interests: list[str] = Field(default_factory=list)
-    sessions_attended: list[str] = Field(default_factory=list)
-    quests_completed: list[str] = Field(default_factory=list)
-    xp_points: int = 0
+    badge_id: str = Field(
+        ..., min_length=1, max_length=50, description="Unique NFC/RFID badge identifier"
+    )
+    name: str = Field(..., min_length=1, max_length=100)
+    email: Optional[str] = Field(default=None, max_length=254)
+    company: Optional[str] = Field(default=None, max_length=100)
+    role: Optional[str] = Field(default=None, max_length=100)
+    interests: list[str] = Field(default_factory=list, max_length=20)
+    sessions_attended: list[str] = Field(default_factory=list, max_length=50)
+    quests_completed: list[str] = Field(default_factory=list, max_length=50)
+    xp_points: int = Field(default=0, ge=0, le=100000)
     last_scanned: Optional[datetime] = None
-    interaction_count: int = 0
-    notes: Optional[str] = None
+    interaction_count: int = Field(default=0, ge=0)
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("interests", "sessions_attended", "quests_completed")
+    @classmethod
+    def validate_list_items(cls, v: list[str]) -> list[str]:
+        """Ensure list items are non-empty and reasonably sized."""
+        return [item.strip() for item in v if item and len(item.strip()) <= 200]
 
 
 class Character(BaseModel):
     """Represents an NPC character that an actor will portray."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     archetype: CharacterArchetype = CharacterArchetype.WIZARD
     personality_prompt: str = Field(
-        ...,
-        description="System prompt defining the character's personality and behavior"
+        ..., min_length=10, max_length=2000,
+        description="System prompt defining the character's personality and behavior",
     )
-    backstory: Optional[str] = None
-    catchphrase: Optional[str] = None
-    voice_style: str = "en-US-Neural2-D"  # Google TTS voice name
-    speaking_rate: float = 1.0
-    pitch: float = 0.0
+    backstory: Optional[str] = Field(default=None, max_length=1000)
+    catchphrase: Optional[str] = Field(default=None, max_length=200)
+    voice_style: str = Field(default="en-US-Neural2-D", max_length=50)
+    speaking_rate: float = Field(default=1.0, ge=0.25, le=4.0)
+    pitch: float = Field(default=0.0, ge=-20.0, le=20.0)
     active: bool = True
-    assigned_actor: Optional[str] = None
+    assigned_actor: Optional[str] = Field(default=None, max_length=100)
 
 
 class EventSession(BaseModel):
     """Represents a session/talk at the event."""
     id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
-    title: str
-    speaker: str
-    track: str = "General"
-    time_slot: str = ""
-    room: Optional[str] = None
-    description: Optional[str] = None
-    tags: list[str] = Field(default_factory=list)
+    title: str = Field(..., min_length=1, max_length=200)
+    speaker: str = Field(..., min_length=1, max_length=100)
+    track: str = Field(default="General", max_length=50)
+    time_slot: str = Field(default="", max_length=50)
+    room: Optional[str] = Field(default=None, max_length=50)
+    description: Optional[str] = Field(default=None, max_length=500)
+    tags: list[str] = Field(default_factory=list, max_length=10)
 
 
 class EventConfig(BaseModel):
     """Top-level event configuration."""
-    event_name: str = "TechCon 3000"
-    event_theme: str = "The Future of Technology"
-    event_date: str = "2026-04-15"
-    venue: str = "Innovation Center"
+    event_name: str = Field(default="TechCon 3000", max_length=200)
+    event_theme: str = Field(default="The Future of Technology", max_length=200)
+    event_date: str = Field(default="2026-04-15", max_length=20)
+    venue: str = Field(default="Innovation Center", max_length=200)
     sessions: list[EventSession] = Field(default_factory=list)
 
 
@@ -124,10 +142,10 @@ class Interaction(BaseModel):
 
 class BadgeScanRequest(BaseModel):
     """Payload when an NFC badge is scanned."""
-    badge_id: str
-    character_id: str
+    badge_id: str = Field(..., min_length=1, max_length=50)
+    character_id: str = Field(..., min_length=1, max_length=50)
     interaction_type: InteractionType = InteractionType.GREETING
-    custom_context: Optional[str] = None
+    custom_context: Optional[str] = Field(default=None, max_length=500)
 
 
 class DialogueResponse(BaseModel):
@@ -144,7 +162,7 @@ class DialogueResponse(BaseModel):
 
 class ActorCueMessage(BaseModel):
     """WebSocket message sent to the actor's earpiece."""
-    type: str = "cue"  # "cue", "system", "alert", "clear"
+    type: str = "cue"
     character_name: str = ""
     attendee_name: str = ""
     dialogue: str = ""
@@ -157,31 +175,57 @@ class ActorCueMessage(BaseModel):
 
 class MoreLinesRequest(BaseModel):
     """Request from actor for additional dialogue lines."""
-    character_id: str
-    attendee_badge_id: str
-    context: str = "continue the conversation"
+    character_id: str = Field(..., min_length=1, max_length=50)
+    attendee_badge_id: str = Field(..., min_length=1, max_length=50)
+    context: str = Field(default="continue the conversation", max_length=500)
 
+
+# ──────────────────────────────────────────────
+#  CRUD Request Models (with proper validation)
+# ──────────────────────────────────────────────
 
 class AttendeeCreate(BaseModel):
-    """Schema for creating a new attendee."""
-    badge_id: str
-    name: str
-    email: Optional[str] = None
-    company: Optional[str] = None
-    role: Optional[str] = None
-    interests: list[str] = Field(default_factory=list)
-    sessions_attended: list[str] = Field(default_factory=list)
-    notes: Optional[str] = None
+    """Schema for creating a new attendee — all inputs validated."""
+    badge_id: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=100)
+    email: Optional[str] = Field(default=None, max_length=254)
+    company: Optional[str] = Field(default=None, max_length=100)
+    role: Optional[str] = Field(default=None, max_length=100)
+    interests: list[str] = Field(default_factory=list, max_length=20)
+    sessions_attended: list[str] = Field(default_factory=list, max_length=50)
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class AttendeeUpdate(BaseModel):
+    """Schema for updating an attendee — all fields optional."""
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    email: Optional[str] = Field(default=None, max_length=254)
+    company: Optional[str] = Field(default=None, max_length=100)
+    role: Optional[str] = Field(default=None, max_length=100)
+    interests: Optional[list[str]] = Field(default=None, max_length=20)
+    sessions_attended: Optional[list[str]] = Field(default=None, max_length=50)
+    notes: Optional[str] = Field(default=None, max_length=500)
 
 
 class CharacterCreate(BaseModel):
-    """Schema for creating a new character."""
-    name: str
+    """Schema for creating a new character — all inputs validated."""
+    name: str = Field(..., min_length=1, max_length=100)
     archetype: CharacterArchetype = CharacterArchetype.WIZARD
-    personality_prompt: str
-    backstory: Optional[str] = None
-    catchphrase: Optional[str] = None
-    voice_style: str = "en-US-Neural2-D"
-    speaking_rate: float = 1.0
-    pitch: float = 0.0
-    assigned_actor: Optional[str] = None
+    personality_prompt: str = Field(..., min_length=10, max_length=2000)
+    backstory: Optional[str] = Field(default=None, max_length=1000)
+    catchphrase: Optional[str] = Field(default=None, max_length=200)
+    voice_style: str = Field(default="en-US-Neural2-D", max_length=50)
+    speaking_rate: float = Field(default=1.0, ge=0.25, le=4.0)
+    pitch: float = Field(default=0.0, ge=-20.0, le=20.0)
+    assigned_actor: Optional[str] = Field(default=None, max_length=100)
+
+
+class CharacterUpdate(BaseModel):
+    """Schema for updating a character — all fields optional."""
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    archetype: Optional[CharacterArchetype] = None
+    personality_prompt: Optional[str] = Field(default=None, min_length=10, max_length=2000)
+    backstory: Optional[str] = Field(default=None, max_length=1000)
+    catchphrase: Optional[str] = Field(default=None, max_length=200)
+    active: Optional[bool] = None
+    assigned_actor: Optional[str] = Field(default=None, max_length=100)

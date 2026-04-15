@@ -4,11 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="NPC Actor System — Admin Dashboard for managing AI-directed NPC actors at live events">
+    <meta name="theme-color" content="#0a0a1a">
+    <meta name="color-scheme" content="dark">
     <title>NPC Actor System — Command Center</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🎭</text></svg>">
 </head>
 <body>
+    <!-- Skip Navigation for keyboard/screen reader users -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <!-- Live announcements for screen readers -->
+    <div id="sr-announcements" class="sr-only" aria-live="assertive" aria-atomic="true" role="status"></div>
+
     <div class="app-container" id="app">
         <!-- Header -->
         <header class="app-header" role="banner">
@@ -23,8 +31,10 @@
             </nav>
         </header>
 
+        <!-- Main Content -->
+        <main id="main-content" role="main">
         <!-- Stats -->
-        <section class="stats-grid" aria-label="System statistics">
+        <section class="stats-grid" aria-label="System statistics" aria-live="polite">
             <div class="stat-card indigo">
                 <div class="stat-label">Attendees</div>
                 <div class="stat-value" id="stat-attendees">—</div>
@@ -103,6 +113,7 @@
                 </div>
             </div>
         </div>
+        </main><!-- end main -->
     </div>
 
     <!-- Add Attendee Modal -->
@@ -208,7 +219,11 @@
     </div>
 
     <!-- Toast Container -->
-    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+    <div class="toast-container" id="toast-container" aria-live="polite" role="log"></div>
+
+    <footer class="app-footer" role="contentinfo">
+        <p>NPC Actor System v1.0 — Powered by Google Gemini &amp; Google Cloud</p>
+    </footer>
 
     <script src="/js/admin.js"></script>
 </body>

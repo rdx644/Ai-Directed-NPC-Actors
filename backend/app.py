@@ -1,49 +1,67 @@
 """
 NPC Actor System — Main FastAPI Application
 
-Routes:
-  - /api/attendees        — Attendee CRUD
-  - /api/characters       — NPC Character CRUD
-  - /api/event            — Event configuration
-  - /api/scan             — NFC badge scan → dialogue generation
-  - /api/interactions     — Interaction log
-  - /api/more-lines       — Actor requests additional lines
-  - /ws/actor/{char_id}   — WebSocket for actor earpiece
-  - /*                    — Static frontend files
+Production-grade application factory with:
+  - Modular route registration via APIRouter
+  - Security middleware stack (headers, rate limiting, error handling)
+  - Structured request logging with correlation IDs
+  - WebSocket connection management for actor earpieces
+  - Static file serving for the frontend UI
+  - Health check endpoint for Cloud Run
+
+Architecture:
+  Routes are organized into separate modules under backend/routes/:
+    - attendees.py  — Attendee CRUD
+    - characters.py — NPC Character CRUD
+    - scanner.py    — Badge scan → Dialogue generation pipeline
+  Middleware is registered from backend/middleware.py
+  Security utilities are in backend/security.py
+  Caching is handled by backend/cache.py
 """
 
 from __future__ import annotations
+
 import json
 import logging
+import sys
 from contextlib import asynccontextmanager
-from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import AsyncGenerator
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
 
+from backend.cache import dialogue_cache
 from backend.config import settings
-from backend.models import (
-    Attendee, AttendeeCreate, Character, CharacterCreate,
-    Interaction, InteractionType, BadgeScanRequest,
-    ActorCueMessage, MoreLinesRequest,
-)
 from backend.database import db
-from backend.gemini_service import generate_dialogue
-from backend.tts_service import synthesize_speech
+from backend.middleware import register_middleware
+from backend.models import ActorCueMessage
 
 # ──────────────────────────────────────────────
-#  Logging
+#  Structured Logging Configuration
 # ──────────────────────────────────────────────
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s │ %(name)-20s │ %(levelname)-5s │ %(message)s",
-    datefmt="%H:%M:%S",
-)
+def _configure_logging() -> None:
+    """Set up structured logging with appropriate level and format."""
+    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
+    logging.basicConfig(
+        level=log_level,
+        format=(
+            "%(asctime)s │ %(name)-28s │ %(levelname)-5s │ %(message)s"
+        ),
+        datefmt="%Y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
+        force=True,
+    )
+    # Suppress noisy third-party loggers
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
+_configure_logging()
 logger = logging.getLogger("npc-system")
 
 
@@ -52,362 +70,177 @@ logger = logging.getLogger("npc-system")
 # ──────────────────────────────────────────────
 
 class ActorConnectionManager:
-    """Manages WebSocket connections for actor earpieces."""
+    """
+    Manages WebSocket connections for actor earpiece devices.
 
-    def __init__(self):
-        # character_id → list of active WebSocket connections
-        self.connections: dict[str, list[WebSocket]] = {}
+    Supports multiple concurrent actors per character and handles
+    graceful disconnection with dead-connection cleanup.
+    """
 
-    async def connect(self, websocket: WebSocket, character_id: str):
+    def __init__(self) -> None:
+        self._connections: dict[str, list[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, character_id: str) -> None:
+        """Accept and register a new WebSocket connection for a character."""
         await websocket.accept()
-        if character_id not in self.connections:
-            self.connections[character_id] = []
-        self.connections[character_id].append(websocket)
-        logger.info(f"Actor connected for character {character_id}")
+        if character_id not in self._connections:
+            self._connections[character_id] = []
+        self._connections[character_id].append(websocket)
+        logger.info(f"Actor connected for character: {character_id}")
 
-    def disconnect(self, websocket: WebSocket, character_id: str):
-        if character_id in self.connections:
-            self.connections[character_id] = [
-                ws for ws in self.connections[character_id] if ws != websocket
+    def disconnect(self, websocket: WebSocket, character_id: str) -> None:
+        """Remove a WebSocket connection from the registry."""
+        if character_id in self._connections:
+            self._connections[character_id] = [
+                ws for ws in self._connections[character_id] if ws != websocket
             ]
-        logger.info(f"Actor disconnected from character {character_id}")
+            # Clean up empty lists
+            if not self._connections[character_id]:
+                del self._connections[character_id]
+        logger.info(f"Actor disconnected from character: {character_id}")
 
-    async def send_cue(self, character_id: str, cue: ActorCueMessage):
-        """Send a dialogue cue to all actors connected for a character."""
-        if character_id not in self.connections:
-            logger.warning(f"No actors connected for character {character_id}")
-            return
-        disconnected = []
-        for ws in self.connections[character_id]:
+    async def send_cue(self, character_id: str, cue: ActorCueMessage) -> int:
+        """
+        Send a dialogue cue to all actors connected for a character.
+
+        Returns:
+            Number of actors that received the cue.
+        """
+        if character_id not in self._connections:
+            logger.debug(f"No actors connected for character: {character_id}")
+            return 0
+
+        sent_count = 0
+        disconnected: list[WebSocket] = []
+
+        for ws in self._connections[character_id]:
             try:
                 await ws.send_json(cue.model_dump())
+                sent_count += 1
             except Exception:
                 disconnected.append(ws)
+
         # Clean up dead connections
         for ws in disconnected:
-            self.connections[character_id].remove(ws)
+            if ws in self._connections.get(character_id, []):
+                self._connections[character_id].remove(ws)
+
+        return sent_count
 
     def get_connected_characters(self) -> list[str]:
-        """Return list of character IDs with active connections."""
+        """Return list of character IDs with active WebSocket connections."""
         return [
-            cid for cid, conns in self.connections.items()
-            if len(conns) > 0
+            cid for cid, conns in self._connections.items() if conns
         ]
 
+    @property
+    def total_connections(self) -> int:
+        """Total number of active WebSocket connections."""
+        return sum(len(conns) for conns in self._connections.values())
 
+
+# Singleton connection manager
 manager = ActorConnectionManager()
 
 
 # ──────────────────────────────────────────────
-#  App Lifespan
+#  Application Lifespan
 # ──────────────────────────────────────────────
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application startup and shutdown lifecycle handler."""
     logger.info("═" * 60)
-    logger.info("  NPC Actor System — Starting Up")
-    logger.info(f"  Environment : {settings.app_env}")
-    logger.info(f"  Database    : {settings.database_mode}")
-    logger.info(f"  TTS Mode    : {settings.tts_mode}")
-    logger.info(f"  Gemini API  : {'configured' if settings.gemini_api_key else 'NOT SET'}")
+    logger.info("  NPC Actor System v1.0.0 — Starting")
+    logger.info(f"  Environment  : {settings.app_env}")
+    logger.info(f"  Database     : {settings.database_mode}")
+    logger.info(f"  TTS Mode     : {settings.tts_mode}")
+    logger.info(f"  Gemini API   : {'✓ configured' if settings.gemini_api_key else '✗ NOT SET'}")
+    logger.info(f"  Rate Limit   : {settings.rate_limit_rpm} req/min")
+    logger.info(f"  CORS Origins : {settings.cors_origins}")
     logger.info("═" * 60)
     yield
-    logger.info("NPC Actor System — Shutting Down")
+    # Cleanup
+    dialogue_cache.clear()
+    logger.info("NPC Actor System — Shut down gracefully")
 
 
 # ──────────────────────────────────────────────
-#  FastAPI App
+#  FastAPI Application Factory
 # ──────────────────────────────────────────────
 
 app = FastAPI(
     title="NPC Actor System",
-    description="AI-Directed NPC Actors for Augmented Live Action Events",
+    description=(
+        "AI-Directed NPC Actors for Augmented Live Action Events. "
+        "Generates personalized, in-character dialogue using Google Gemini "
+        "and delivers it to actor earpieces in real-time via WebSocket."
+    ),
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/api/docs" if not settings.is_production else None,
+    redoc_url="/api/redoc" if not settings.is_production else None,
 )
 
-# CORS for development
+# ── GZip Compression ──
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# ── CORS Configuration ──
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins if settings.is_production else ["*"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Request-ID"],
+    expose_headers=["X-Request-ID", "X-Response-Time"],
 )
 
+# ── Security, Rate Limiting, Logging, Error Handling ──
+register_middleware(app)
 
 # ──────────────────────────────────────────────
-#  Health Check
+#  Route Registration
 # ──────────────────────────────────────────────
 
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint for Cloud Run."""
+from backend.routes.attendees import router as attendees_router
+from backend.routes.characters import router as characters_router
+from backend.routes.scanner import router as scanner_router
+
+app.include_router(attendees_router)
+app.include_router(characters_router)
+app.include_router(scanner_router)
+
+
+# ──────────────────────────────────────────────
+#  Health & System Endpoints
+# ──────────────────────────────────────────────
+
+@app.get("/api/health", tags=["System"])
+async def health_check() -> dict:
+    """
+    Health check endpoint for Cloud Run and monitoring.
+
+    Returns system status including service health, configuration,
+    connected actors, and cache performance metrics.
+    """
     return {
         "status": "healthy",
         "service": "npc-actor-system",
+        "version": "1.0.0",
         "environment": settings.app_env,
         "gemini_configured": bool(settings.gemini_api_key),
         "tts_mode": settings.tts_mode,
         "database_mode": settings.database_mode,
         "connected_actors": manager.get_connected_characters(),
+        "total_actor_connections": manager.total_connections,
+        "cache_stats": dialogue_cache.stats,
     }
 
 
-# ──────────────────────────────────────────────
-#  Attendee Routes
-# ──────────────────────────────────────────────
-
-@app.get("/api/attendees")
-async def list_attendees():
-    """List all registered attendees."""
-    attendees = db.list_attendees()
-    return [a.model_dump() for a in attendees]
-
-
-@app.get("/api/attendees/{attendee_id}")
-async def get_attendee(attendee_id: str):
-    """Get a specific attendee by ID."""
-    attendee = db.get_attendee(attendee_id)
-    if not attendee:
-        raise HTTPException(status_code=404, detail="Attendee not found")
-    return attendee.model_dump()
-
-
-@app.post("/api/attendees", status_code=201)
-async def create_attendee(data: AttendeeCreate):
-    """Register a new attendee."""
-    attendee = Attendee(**data.model_dump())
-    created = db.create_attendee(attendee)
-    return created.model_dump()
-
-
-@app.put("/api/attendees/{attendee_id}")
-async def update_attendee(attendee_id: str, data: dict):
-    """Update an existing attendee."""
-    updated = db.update_attendee(attendee_id, data)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Attendee not found")
-    return updated.model_dump()
-
-
-@app.delete("/api/attendees/{attendee_id}")
-async def delete_attendee(attendee_id: str):
-    """Delete an attendee."""
-    if not db.delete_attendee(attendee_id):
-        raise HTTPException(status_code=404, detail="Attendee not found")
-    return {"status": "deleted"}
-
-
-# ──────────────────────────────────────────────
-#  Character Routes
-# ──────────────────────────────────────────────
-
-@app.get("/api/characters")
-async def list_characters():
-    """List all NPC characters."""
-    characters = db.list_characters()
-    return [c.model_dump() for c in characters]
-
-
-@app.get("/api/characters/{character_id}")
-async def get_character(character_id: str):
-    """Get a specific character by ID."""
-    character = db.get_character(character_id)
-    if not character:
-        raise HTTPException(status_code=404, detail="Character not found")
-    return character.model_dump()
-
-
-@app.post("/api/characters", status_code=201)
-async def create_character(data: CharacterCreate):
-    """Create a new NPC character."""
-    character = Character(**data.model_dump())
-    created = db.create_character(character)
-    return created.model_dump()
-
-
-@app.put("/api/characters/{character_id}")
-async def update_character(character_id: str, data: dict):
-    """Update an existing character."""
-    updated = db.update_character(character_id, data)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Character not found")
-    return updated.model_dump()
-
-
-@app.delete("/api/characters/{character_id}")
-async def delete_character(character_id: str):
-    """Delete a character."""
-    if not db.delete_character(character_id):
-        raise HTTPException(status_code=404, detail="Character not found")
-    return {"status": "deleted"}
-
-
-# ──────────────────────────────────────────────
-#  Event Routes
-# ──────────────────────────────────────────────
-
-@app.get("/api/event")
-async def get_event():
-    """Get the current event configuration."""
+@app.get("/api/event", tags=["Event"])
+async def get_event() -> dict:
+    """Get the current event configuration and schedule."""
     return db.get_event().model_dump()
-
-
-@app.put("/api/event")
-async def update_event(data: dict):
-    """Update the event configuration."""
-    updated = db.update_event(data)
-    return updated.model_dump()
-
-
-# ──────────────────────────────────────────────
-#  Interaction Routes
-# ──────────────────────────────────────────────
-
-@app.get("/api/interactions")
-async def list_interactions(limit: int = 50):
-    """List recent interactions (newest first)."""
-    interactions = db.list_interactions(limit=limit)
-    return [i.model_dump() for i in interactions]
-
-
-# ──────────────────────────────────────────────
-#  ⭐ Core Feature: Badge Scan → Dialogue
-# ──────────────────────────────────────────────
-
-@app.post("/api/scan")
-async def scan_badge(request: BadgeScanRequest):
-    """
-    Process an NFC badge scan and generate NPC dialogue.
-
-    Flow:
-    1. Look up attendee by badge_id
-    2. Look up the NPC character
-    3. Generate dialogue using Gemini
-    4. Optionally synthesize speech via Google TTS
-    5. Push dialogue to actor's earpiece via WebSocket
-    6. Log the interaction
-    """
-    # 1. Find the attendee
-    attendee = db.get_attendee_by_badge(request.badge_id)
-    if not attendee:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No attendee found with badge ID: {request.badge_id}"
-        )
-
-    # 2. Find the character
-    character = db.get_character(request.character_id)
-    if not character:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Character not found: {request.character_id}"
-        )
-
-    # 3. Get event context
-    event = db.get_event()
-
-    # 4. Generate dialogue via Gemini
-    dialogue_response = await generate_dialogue(
-        character=character,
-        attendee=attendee,
-        event=event,
-        interaction_type=request.interaction_type,
-        custom_context=request.custom_context,
-    )
-
-    # 5. Synthesize speech (if Google TTS is enabled)
-    audio_b64 = await synthesize_speech(
-        text=dialogue_response.dialogue,
-        voice_name=character.voice_style,
-        speaking_rate=character.speaking_rate,
-        pitch=character.pitch,
-    )
-    dialogue_response.audio_base64 = audio_b64
-
-    # 6. Push to actor via WebSocket
-    cue = ActorCueMessage(
-        type="cue",
-        character_name=character.name,
-        attendee_name=attendee.name,
-        dialogue=dialogue_response.dialogue,
-        stage_direction=dialogue_response.stage_direction,
-        interaction_type=request.interaction_type.value,
-        quest=dialogue_response.quest,
-        audio_base64=audio_b64,
-    )
-    await manager.send_cue(request.character_id, cue)
-
-    # 7. Log the interaction
-    interaction = Interaction(
-        attendee_id=attendee.id,
-        attendee_name=attendee.name,
-        character_id=character.id,
-        character_name=character.name,
-        interaction_type=request.interaction_type,
-        dialogue_generated=dialogue_response.dialogue,
-        quest_given=dialogue_response.quest,
-        badge_id=request.badge_id,
-    )
-    db.add_interaction(interaction)
-
-    # 8. Update attendee stats
-    db.update_attendee(attendee.id, {
-        "interaction_count": attendee.interaction_count + 1,
-        "last_scanned": datetime.utcnow(),
-        "xp_points": attendee.xp_points + (50 if dialogue_response.quest else 10),
-    })
-
-    return dialogue_response.model_dump()
-
-
-# ──────────────────────────────────────────────
-#  Actor: Request More Lines
-# ──────────────────────────────────────────────
-
-@app.post("/api/more-lines")
-async def request_more_lines(request: MoreLinesRequest):
-    """Actor requests additional dialogue lines mid-conversation."""
-    character = db.get_character(request.character_id)
-    if not character:
-        raise HTTPException(status_code=404, detail="Character not found")
-
-    attendee = db.get_attendee_by_badge(request.attendee_badge_id)
-    if not attendee:
-        raise HTTPException(status_code=404, detail="Attendee not found")
-
-    event = db.get_event()
-
-    dialogue_response = await generate_dialogue(
-        character=character,
-        attendee=attendee,
-        event=event,
-        interaction_type=InteractionType.LORE,
-        custom_context=request.context,
-    )
-
-    audio_b64 = await synthesize_speech(
-        text=dialogue_response.dialogue,
-        voice_name=character.voice_style,
-        speaking_rate=character.speaking_rate,
-        pitch=character.pitch,
-    )
-    dialogue_response.audio_base64 = audio_b64
-
-    # Push to actor
-    cue = ActorCueMessage(
-        type="cue",
-        character_name=character.name,
-        attendee_name=attendee.name,
-        dialogue=dialogue_response.dialogue,
-        stage_direction="Continue the conversation naturally.",
-        interaction_type="lore",
-        audio_base64=audio_b64,
-    )
-    await manager.send_cue(request.character_id, cue)
-
-    return dialogue_response.model_dump()
 
 
 # ──────────────────────────────────────────────
@@ -415,12 +248,16 @@ async def request_more_lines(request: MoreLinesRequest):
 # ──────────────────────────────────────────────
 
 @app.websocket("/ws/actor/{character_id}")
-async def actor_websocket(websocket: WebSocket, character_id: str):
+async def actor_websocket(websocket: WebSocket, character_id: str) -> None:
     """
     WebSocket endpoint for actor earpiece connections.
 
-    On connect: sends character info and welcome message.
-    Listens for actor commands (e.g., "more", "hint").
+    Lifecycle:
+      1. Validates the character exists
+      2. Accepts connection and sends welcome message
+      3. Listens for actor commands (ping, status)
+      4. Receives dialogue cues pushed by the scan pipeline
+      5. Handles disconnection gracefully
     """
     character = db.get_character(character_id)
     if not character:
@@ -436,12 +273,12 @@ async def actor_websocket(websocket: WebSocket, character_id: str):
         dialogue=f"Connected as {character.name}. Waiting for badge scans...",
         stage_direction="Get into character. Your earpiece is live.",
     )
+
     try:
         await websocket.send_json(welcome.model_dump())
 
         while True:
             data = await websocket.receive_text()
-            # Handle actor commands
             try:
                 msg = json.loads(data)
                 cmd = msg.get("command", "")
@@ -457,12 +294,12 @@ async def actor_websocket(websocket: WebSocket, character_id: str):
                     })
 
             except json.JSONDecodeError:
-                pass
+                logger.debug(f"Non-JSON message from actor: {data[:50]}")
 
     except WebSocketDisconnect:
         manager.disconnect(websocket, character_id)
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        logger.error(f"WebSocket error for {character_id}: {e}")
         manager.disconnect(websocket, character_id)
 
 
@@ -472,21 +309,23 @@ async def actor_websocket(websocket: WebSocket, character_id: str):
 
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
-# Serve static assets (CSS, JS)
 if FRONTEND_DIR.exists():
     app.mount("/css", StaticFiles(directory=FRONTEND_DIR / "css"), name="css")
     app.mount("/js", StaticFiles(directory=FRONTEND_DIR / "js"), name="js")
 
-    @app.get("/")
-    async def serve_admin():
+    @app.get("/", tags=["Frontend"], include_in_schema=False)
+    async def serve_admin() -> FileResponse:
+        """Serve the Admin Dashboard."""
         return FileResponse(FRONTEND_DIR / "index.html")
 
-    @app.get("/actor")
-    async def serve_actor():
+    @app.get("/actor", tags=["Frontend"], include_in_schema=False)
+    async def serve_actor() -> FileResponse:
+        """Serve the Actor Earpiece interface."""
         return FileResponse(FRONTEND_DIR / "actor.html")
 
-    @app.get("/scanner")
-    async def serve_scanner():
+    @app.get("/scanner", tags=["Frontend"], include_in_schema=False)
+    async def serve_scanner() -> FileResponse:
+        """Serve the Badge Scanner simulator."""
         return FileResponse(FRONTEND_DIR / "scanner.html")
 
 
@@ -496,10 +335,11 @@ if FRONTEND_DIR.exists():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "backend.app:app",
         host=settings.app_host,
         port=settings.app_port,
         reload=not settings.is_production,
-        log_level="info",
+        log_level=settings.log_level.lower(),
     )

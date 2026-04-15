@@ -4,11 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="NPC Actor Earpiece — Real-time AI dialogue feed for live event actors">
+    <meta name="theme-color" content="#0a0a1a">
+    <meta name="color-scheme" content="dark">
     <title>NPC Actor Earpiece — Live Feed</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🎧</text></svg>">
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div id="sr-announcements" class="sr-only" aria-live="assertive" aria-atomic="true" role="status"></div>
+
     <div class="app-container" id="app">
         <!-- Header -->
         <header class="app-header" role="banner">
@@ -24,7 +29,7 @@
         </header>
 
         <!-- Character Selector (shown before connection) -->
-        <div id="connect-screen" class="card" style="max-width: 600px; margin: 60px auto; text-align: center;">
+        <div id="connect-screen" class="card" style="max-width: 600px; margin: 60px auto; text-align: center;" role="region" aria-label="Character connection">
             <div style="font-size: 4rem; margin-bottom: 16px;">🎭</div>
             <h2 style="margin-bottom: 8px;">Connect as an NPC Character</h2>
             <p style="color: var(--text-secondary); margin-bottom: 24px;">
@@ -103,8 +108,11 @@
         </div>
     </div>
 
-    <!-- Toast Container -->
-    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+    <div class="toast-container" id="toast-container" aria-live="polite" role="log"></div>
+
+    <footer class="app-footer" role="contentinfo">
+        <p>NPC Actor System v1.0 — Powered by Google Gemini &amp; Google Cloud</p>
+    </footer>
 
     <script src="/js/actor.js"></script>
 </body>

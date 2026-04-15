@@ -1063,3 +1063,93 @@ tr:last-child td {
         --text-muted: #a0a0a0;
     }
 }
+
+/* ──────────────────────────────────────────────
+   Skip Navigation Link
+   ────────────────────────────────────────────── */
+.skip-link {
+    position: absolute;
+    top: -100%;
+    left: 16px;
+    z-index: 99999;
+    padding: 12px 24px;
+    background: var(--accent-primary);
+    color: white;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: top 0.2s;
+}
+
+.skip-link:focus {
+    top: 16px;
+    outline: 3px solid var(--accent-cyan);
+    outline-offset: 2px;
+}
+
+/* ──────────────────────────────────────────────
+   Footer
+   ────────────────────────────────────────────── */
+.app-footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    border-top: 1px solid var(--border-subtle);
+    margin-top: 40px;
+}
+
+/* ──────────────────────────────────────────────
+   Enhanced Focus Indicators (WCAG 2.1 AA)
+   ────────────────────────────────────────────── */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid var(--accent-cyan);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Keyboard-only focus (hide focus ring for mouse users) */
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* ──────────────────────────────────────────────
+   Color Contrast Enhancements (WCAG AA)
+   ────────────────────────────────────────────── */
+.form-label {
+    /* Ensure labels meet 4.5:1 contrast ratio against dark bg */
+    color: #b0bec5;
+}
+
+.empty-state .title {
+    color: var(--text-primary);
+}
+
+.empty-state .description {
+    color: var(--text-secondary);
+}
+
+/* ──────────────────────────────────────────────
+   Print Styles
+   ────────────────────────────────────────────── */
+@media print {
+    body::before { display: none; }
+    .app-header, .app-nav, .toast-container, .btn, .modal-overlay {
+        display: none !important;
+    }
+    body {
+        background: white;
+        color: black;
+    }
+    .card {
+        background: white;
+        border: 1px solid #ccc;
+        box-shadow: none;
+    }
+}

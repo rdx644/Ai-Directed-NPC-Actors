@@ -4,11 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="NPC Actor System — NFC Badge Scanner Simulator for generating AI dialogue">
+    <meta name="theme-color" content="#0a0a1a">
+    <meta name="color-scheme" content="dark">
     <title>NPC Actor System — Badge Scanner</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>📡</text></svg>">
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div id="sr-announcements" class="sr-only" aria-live="assertive" aria-atomic="true" role="status"></div>
+
     <div class="app-container" id="app">
         <!-- Header -->
         <header class="app-header" role="banner">
@@ -23,6 +28,7 @@
             </nav>
         </header>
 
+        <main id="main-content" role="main">
         <div class="scanner-layout">
             <!-- Left: Scanner Controls -->
             <div style="display: flex; flex-direction: column; gap: 24px;">
@@ -115,10 +121,14 @@
                 </div>
             </div>
         </div>
+        </main>
     </div>
 
-    <!-- Toast Container -->
-    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+    <div class="toast-container" id="toast-container" aria-live="polite" role="log"></div>
+
+    <footer class="app-footer" role="contentinfo">
+        <p>NPC Actor System v1.0 — Powered by Google Gemini &amp; Google Cloud</p>
+    </footer>
 
     <script src="/js/scanner.js"></script>
 </body>
