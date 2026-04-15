@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     # --- App Config ---
     app_env: str = "development"
     app_port: int = 8080
-    app_host: str = "0.0.0.0"
+    app_host: str = "0.0.0.0"  # noqa: S104
     log_level: str = "INFO"
 
     # --- Feature Modes ---
