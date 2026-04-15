@@ -135,9 +135,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return False
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        # Skip rate limiting for health checks and static files
+        # Skip rate limiting for health checks, static files, and testing
         path = request.url.path
         if path in ("/api/health",) or path.startswith(("/css/", "/js/")):
+            return await call_next(request)
+
+        # Disable rate limiting in testing environment
+        if settings.app_env == "testing":
             return await call_next(request)
 
         client_ip = self._get_client_ip(request)

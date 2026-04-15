@@ -5,9 +5,17 @@ Provides reusable test fixtures:
   - FastAPI test client
   - Sample data factories
   - Mock service patches
+
+Sets APP_ENV=testing to disable rate limiting during tests.
 """
 
 from __future__ import annotations
+
+import os
+
+os.environ["APP_ENV"] = "testing"
+os.environ["RATE_LIMIT_RPM"] = "10000"
+os.environ["RATE_LIMIT_BURST"] = "10000"
 
 from unittest.mock import AsyncMock, patch
 

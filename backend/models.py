@@ -13,7 +13,7 @@ Defines strictly-typed schemas with field-level validation for:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
@@ -141,7 +141,7 @@ class Interaction(BaseModel):
     interaction_type: InteractionType = InteractionType.GREETING
     dialogue_generated: str = ""
     quest_given: str | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     badge_id: str = ""
 
 
@@ -169,7 +169,7 @@ class DialogueResponse(BaseModel):
     quest: str | None = None
     stage_direction: str | None = None
     audio_base64: str | None = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ActorCueMessage(BaseModel):
@@ -183,7 +183,7 @@ class ActorCueMessage(BaseModel):
     interaction_type: str = "greeting"
     quest: str | None = None
     audio_base64: str | None = None
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class MoreLinesRequest(BaseModel):

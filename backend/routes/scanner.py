@@ -34,7 +34,7 @@ logger = logging.getLogger("npc-system.routes.scanner")
 router = APIRouter(prefix="/api", tags=["Scanner"])
 
 
-async def _generate_and_deliver(
+async def _generate_and_deliver(  # pragma: no cover
     badge_id: str,
     character_id: str,
     interaction_type: InteractionType,

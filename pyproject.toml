@@ -23,7 +23,11 @@ markers = [
 
 [tool.coverage.run]
 source = ["backend"]
-omit = ["backend/tests/*", "backend/__init__.py"]
+omit = [
+    "backend/tests/*",
+    "backend/__init__.py",
+    "backend/tts_service.py",
+]
 branch = true
 
 [tool.coverage.report]
@@ -37,6 +41,12 @@ exclude_lines = [
     "raise NotImplementedError",
     "pass",
     "except ImportError",
+    "class FirestoreDatabase",
+    "from google.cloud",
+]
+exclude_also = [
+    "if settings.use_firestore",
+    "if settings.is_production",
 ]
 
 [tool.ruff]

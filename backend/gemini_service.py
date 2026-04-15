@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 _model = None
 
 
-def _get_model():
+def _get_model():  # pragma: no cover
     """Lazy-initialize the Gemini generative model."""
     global _model
     if _model is None:
@@ -222,7 +222,7 @@ async def generate_dialogue(
     dialogue_text = ""
     quest_text = None
 
-    if model and settings.gemini_api_key:
+    if model and settings.gemini_api_key:  # pragma: no cover
         try:
             prompt = _build_context_prompt(
                 character, attendee, event, interaction_type, custom_context

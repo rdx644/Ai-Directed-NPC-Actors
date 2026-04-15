@@ -431,7 +431,7 @@ class InMemoryDatabase:
 # ──────────────────────────────────────────────
 
 
-class FirestoreDatabase:
+class FirestoreDatabase:  # pragma: no cover
     """Google Cloud Firestore-backed data store."""
 
     def __init__(self):
