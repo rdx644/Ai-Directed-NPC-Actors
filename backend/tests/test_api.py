@@ -30,9 +30,9 @@ class TestHealthEndpoint:
         data = client.get("/api/health").json()
         assert data["status"] == "healthy"
         assert data["service"] == "npc-actor-system"
-        assert data["version"] == "1.0.0"
-        assert "gemini_configured" in data
-        assert "tts_mode" in data
+        assert data["version"] == "2.0.0"
+        assert "google_services" in data
+        assert "tts_mode" in data["google_services"]
         assert "cache_stats" in data
 
     def test_health_includes_cache_stats(self, client: TestClient) -> None:
