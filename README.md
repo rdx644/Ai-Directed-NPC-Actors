@@ -234,6 +234,6 @@ gcloud run deploy npc-actor-system \
 |---|---|
 | `ws://host/ws/actor/{character_id}` | Actor earpiece connection |
 
-## 📄 License
+##  License
 
 MIT License — see [LICENSE](LICENSE) for details.
