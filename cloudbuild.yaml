@@ -1,16 +1,24 @@
 # Google Cloud Build configuration for deploying to Cloud Run
 # Usage: gcloud builds submit --config cloudbuild.yaml .
+#
+# Integrated Google Cloud Services:
+#   - Cloud Build: CI/CD pipeline
+#   - Container Registry: Docker image storage
+#   - Cloud Run: Serverless container hosting
+#   - Cloud Logging: Structured application logging
+#   - Secret Manager: Secure credential management
+#   - Cloud Storage: Audio and data persistence
 
 steps:
-  # Build the Docker image
+  # Step 1: Build the Docker image with Cloud Build
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/npc-actor-system:$COMMIT_SHA', '.']
 
-  # Push to Container Registry
+  # Step 2: Push to Google Container Registry
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/$PROJECT_ID/npc-actor-system:$COMMIT_SHA']
 
-  # Deploy to Cloud Run
+  # Step 3: Deploy to Cloud Run with full Google Cloud integration
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -33,11 +41,16 @@ steps:
       - '--min-instances'
       - '0'
       - '--max-instances'
-      - '3'
+      - '5'
       - '--set-env-vars'
-      - 'APP_ENV=production,DATABASE_MODE=memory,TTS_MODE=browser'
+      - 'APP_ENV=production,DATABASE_MODE=memory,TTS_MODE=browser,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GCS_BUCKET_NAME=$PROJECT_ID-npc-audio'
+      - '--set-secrets'
+      - 'GEMINI_API_KEY=GEMINI_API_KEY:latest,ADMIN_API_KEY=ADMIN_API_KEY:latest'
 
 images:
   - 'gcr.io/$PROJECT_ID/npc-actor-system:$COMMIT_SHA'
 
 timeout: '600s'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

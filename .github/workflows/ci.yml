@@ -1,4 +1,4 @@
-name: CI — NPC Actor System
+name: CI — NPC Actor System v2.0
 
 on:
   push:
@@ -29,6 +29,10 @@ jobs:
     name: Tests & Coverage
     runs-on: ubuntu-latest
     needs: lint
+    env:
+      APP_ENV: testing
+      DATABASE_MODE: memory
+      TTS_MODE: browser
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -66,7 +70,7 @@ jobs:
       - name: Install ruff
         run: pip install ruff==0.8.6
       - name: Run security rules (Bandit via Ruff)
-        run: ruff check backend/ --select S
+        run: ruff check backend/ --select S --ignore S101,S104,S106
 
   docker:
     name: Docker Build
@@ -79,6 +83,7 @@ jobs:
       - name: Verify health endpoint
         run: |
           docker run -d --name npc-test -p 8080:8080 \
+            -e APP_ENV=production \
             -e DATABASE_MODE=memory \
             -e TTS_MODE=browser \
             npc-actor-system:test

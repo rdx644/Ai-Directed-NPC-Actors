@@ -1,11 +1,15 @@
 [project]
 name = "npc-actor-system"
-version = "1.0.0"
-description = "AI-Directed NPC Actors for Augmented Live Action Events"
+version = "2.0.0"
+description = "AI-Directed NPC Actors for Augmented Live Action Events — Powered by Google Cloud"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [{name = "NPC Actor System Team"}]
 readme = "README.md"
+keywords = [
+    "npc", "ai", "gemini", "google-cloud", "fastapi",
+    "websocket", "live-action", "text-to-speech", "firestore",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
@@ -70,7 +74,11 @@ select = [
     "SIM", # flake8-simplify
     "RUF", # Ruff-specific rules
 ]
-ignore = ["S101", "S104", "E501"]
+ignore = [
+    "S101",   # assert in tests is fine
+    "S104",   # 0.0.0.0 binding for Cloud Run
+    "E501",   # line length handled by formatter
+]
 
 [tool.ruff.lint.per-file-ignores]
 "backend/tests/*" = ["S101", "S106"]

@@ -35,10 +35,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.cache import dialogue_cache
+from backend.cloud_logging import log_event
 from backend.config import settings
 from backend.database import db
 from backend.middleware import register_middleware
 from backend.models import ActorCueMessage
+from backend.routes.analytics import router as analytics_router
 from backend.routes.attendees import router as attendees_router
 from backend.routes.characters import router as characters_router
 from backend.routes.scanner import router as scanner_router
@@ -153,17 +155,35 @@ manager = ActorConnectionManager()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application startup and shutdown lifecycle handler."""
     logger.info("═" * 60)
-    logger.info("  NPC Actor System v1.0.0 — Starting")
+    logger.info("  NPC Actor System v2.0.0 — Starting")
     logger.info(f"  Environment  : {settings.app_env}")
     logger.info(f"  Database     : {settings.database_mode}")
     logger.info(f"  TTS Mode     : {settings.tts_mode}")
     logger.info(f"  Gemini API   : {'✓ configured' if settings.gemini_api_key else '✗ NOT SET'}")
+    logger.info(f"  Cloud Project: {settings.google_cloud_project or '✗ NOT SET'}")
+    logger.info(f"  GCS Bucket   : {settings.gcs_bucket_name or 'auto'}")
     logger.info(f"  Rate Limit   : {settings.rate_limit_rpm} req/min")
     logger.info(f"  CORS Origins : {settings.cors_origins}")
     logger.info("═" * 60)
+
+    # Log startup event to Google Cloud Logging
+    log_event(
+        "system_startup",
+        {
+            "version": "2.0.0",
+            "environment": settings.app_env,
+            "database_mode": settings.database_mode,
+            "tts_mode": settings.tts_mode,
+            "gemini_configured": bool(settings.gemini_api_key),
+            "gcp_project": settings.google_cloud_project or "none",
+        },
+    )
+
     yield
+
     # Cleanup
     dialogue_cache.clear()
+    log_event("system_shutdown", {"version": "2.0.0"})
     logger.info("NPC Actor System — Shut down gracefully")
 
 
@@ -207,6 +227,7 @@ register_middleware(app)
 app.include_router(attendees_router)
 app.include_router(characters_router)
 app.include_router(scanner_router)
+app.include_router(analytics_router)
 
 
 # ──────────────────────────────────────────────
@@ -225,11 +246,17 @@ async def health_check() -> dict:
     return {
         "status": "healthy",
         "service": "npc-actor-system",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "environment": settings.app_env,
-        "gemini_configured": bool(settings.gemini_api_key),
-        "tts_mode": settings.tts_mode,
-        "database_mode": settings.database_mode,
+        "google_services": {
+            "gemini_configured": bool(settings.gemini_api_key),
+            "cloud_project": settings.google_cloud_project or "not configured",
+            "cloud_logging": settings.is_production,
+            "cloud_storage": bool(settings.gcs_bucket_name or settings.google_cloud_project),
+            "secret_manager": settings.is_production,
+            "tts_mode": settings.tts_mode,
+            "database_mode": settings.database_mode,
+        },
         "connected_actors": manager.get_connected_characters(),
         "total_actor_connections": manager.total_connections,
         "cache_stats": dialogue_cache.stats,

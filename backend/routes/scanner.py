@@ -5,17 +5,26 @@ Core business logic:
   - POST /api/scan       — NFC badge scan → Gemini dialogue → WebSocket push
   - POST /api/more-lines — Actor requests additional dialogue
   - GET  /api/interactions — Interaction history log
+
+Integrates with:
+  - Google Gemini: AI dialogue generation
+  - Google Cloud TTS: Speech synthesis
+  - Google Cloud Logging: Structured event logging
+  - Google Cloud Storage: Audio clip persistence
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
 from backend.cache import CacheKey, dialogue_cache
+from backend.cloud_logging import log_event, log_latency
+from backend.cloud_storage import store_audio
 from backend.database import db
 from backend.gemini_service import generate_dialogue
 from backend.models import (
@@ -63,6 +72,8 @@ async def _generate_and_deliver(  # pragma: no cover
     # Import manager here to avoid circular imports
     from backend.app import manager
 
+    pipeline_start = time.monotonic()
+
     # 1. Look up attendee
     attendee = db.get_attendee_by_badge(badge_id)
     if not attendee:
@@ -85,12 +96,20 @@ async def _generate_and_deliver(  # pragma: no cover
         cached = dialogue_cache.get(cache_key)
         if cached:
             logger.info(f"Cache hit for {attendee.name} ↔ {character.name}")
+            log_event(
+                "cache_hit",
+                {
+                    "attendee": attendee.name,
+                    "character": character.name,
+                },
+            )
             return cached
 
     # 4. Get event context
     event = db.get_event()
 
     # 5. Generate dialogue via Gemini
+    gemini_start = time.monotonic()
     dialogue_response = await generate_dialogue(
         character=character,
         attendee=attendee,
@@ -98,11 +117,20 @@ async def _generate_and_deliver(  # pragma: no cover
         interaction_type=interaction_type,
         custom_context=custom_context,
     )
+    log_latency(
+        "gemini_generation",
+        gemini_start,
+        metadata={
+            "character": character.name,
+            "interaction_type": interaction_type.value,
+        },
+    )
 
     # 6. Apply content safety filter
     dialogue_response.dialogue = filter_generated_content(dialogue_response.dialogue)
 
     # 7. Synthesize speech (if Google TTS is enabled)
+    tts_start = time.monotonic()
     audio_b64 = await synthesize_speech(
         text=dialogue_response.dialogue,
         voice_name=character.voice_style,
@@ -110,6 +138,17 @@ async def _generate_and_deliver(  # pragma: no cover
         pitch=character.pitch,
     )
     dialogue_response.audio_base64 = audio_b64
+    log_latency("tts_synthesis", tts_start)
+
+    # 7b. Persist audio to Google Cloud Storage
+    if audio_b64:
+        import base64
+
+        try:
+            audio_bytes = base64.b64decode(audio_b64)
+            store_audio(audio_bytes, character_id, f"{attendee.id}-{int(time.time())}")
+        except Exception as e:
+            logger.warning(f"Audio storage failed (non-critical): {e}")
 
     # 8. Push to actor via WebSocket
     cue = ActorCueMessage(
@@ -152,6 +191,31 @@ async def _generate_and_deliver(  # pragma: no cover
     if use_cache and not custom_context:
         dialogue_cache.put(cache_key, dialogue_response)
 
+    # 12. Log pipeline completion to Google Cloud Logging
+    pipeline_ms = log_latency(
+        "scan_pipeline_total",
+        pipeline_start,
+        metadata={
+            "attendee": attendee.name,
+            "character": character.name,
+            "interaction_type": interaction_type.value,
+            "quest_given": bool(dialogue_response.quest),
+            "xp_awarded": xp_gained,
+        },
+    )
+
+    log_event(
+        "dialogue_generated",
+        {
+            "attendee_name": attendee.name,
+            "character_name": character.name,
+            "interaction_type": interaction_type.value,
+            "dialogue_length": len(dialogue_response.dialogue),
+            "quest_given": bool(dialogue_response.quest),
+            "pipeline_latency_ms": round(pipeline_ms, 2),
+        },
+    )
+
     return dialogue_response
 
 
@@ -167,9 +231,11 @@ async def scan_badge(request: BadgeScanRequest) -> dict[str, Any]:
     4. Generate dialogue using Google Gemini
     5. Apply content safety filter
     6. Synthesize speech via Google Cloud TTS
-    7. Push dialogue to actor's earpiece via WebSocket
-    8. Log the interaction to database
-    9. Update attendee XP stats
+    7. Store audio in Google Cloud Storage
+    8. Push dialogue to actor's earpiece via WebSocket
+    9. Log the interaction to database
+    10. Update attendee XP stats
+    11. Log structured event to Google Cloud Logging
     """
     # Sanitize optional custom context
     custom_ctx = None

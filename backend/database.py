@@ -1,14 +1,19 @@
 """
-Database service with dual-mode support:
-  - In-memory storage (default, for demos and local dev)
-  - Google Cloud Firestore (production)
+Database service with dual-mode support and abstract interface.
 
+Architecture:
+    DatabaseProtocol (abstract interface)
+    ├── InMemoryDatabase   — Default, for demos and local dev
+    └── FirestoreDatabase  — Google Cloud Firestore (production)
+
+The active implementation is selected via DATABASE_MODE environment variable.
 Pre-loaded with realistic demo data for the prototype.
 """
 
 from __future__ import annotations
 
 import logging
+from typing import Protocol, runtime_checkable
 
 from backend.config import settings
 from backend.models import (
@@ -21,6 +26,44 @@ from backend.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ──────────────────────────────────────────────
+#  Database Protocol (Abstract Interface)
+# ──────────────────────────────────────────────
+
+
+@runtime_checkable
+class DatabaseProtocol(Protocol):
+    """
+    Abstract interface contract for all database implementations.
+
+    Defines the required CRUD operations for attendees, characters,
+    interactions, and event configuration. All database backends
+    (InMemoryDatabase, FirestoreDatabase) must implement this protocol.
+
+    This enables type-safe dependency injection and seamless swapping
+    between storage backends without modifying business logic.
+    """
+
+    def get_attendee(self, attendee_id: str) -> Attendee | None: ...
+    def get_attendee_by_badge(self, badge_id: str) -> Attendee | None: ...
+    def list_attendees(self) -> list[Attendee]: ...
+    def create_attendee(self, attendee: Attendee) -> Attendee: ...
+    def update_attendee(self, attendee_id: str, data: dict) -> Attendee | None: ...
+    def delete_attendee(self, attendee_id: str) -> bool: ...
+
+    def get_character(self, character_id: str) -> Character | None: ...
+    def list_characters(self) -> list[Character]: ...
+    def create_character(self, character: Character) -> Character: ...
+    def update_character(self, character_id: str, data: dict) -> Character | None: ...
+    def delete_character(self, character_id: str) -> bool: ...
+
+    def add_interaction(self, interaction: Interaction) -> Interaction: ...
+    def list_interactions(self, limit: int = 50) -> list[Interaction]: ...
+
+    def get_event(self) -> EventConfig: ...
+    def update_event(self, data: dict) -> EventConfig: ...
 
 
 # ──────────────────────────────────────────────

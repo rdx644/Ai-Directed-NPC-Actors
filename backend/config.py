@@ -43,10 +43,14 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     google_cloud_project: str = ""
 
+    # --- Google Cloud Storage ---
+    gcs_bucket_name: str = ""
+    gcs_location: str = "us-central1"
+
     # --- App Config ---
     app_env: str = "development"
     app_port: int = 8080
-    app_host: str = "0.0.0.0"  # noqa: S104
+    app_host: str = "0.0.0.0"
     log_level: str = "INFO"
 
     # --- Feature Modes ---
