@@ -1,4 +1,4 @@
-# 🎭 AI-Directed NPC Actor System v2.0
+# AI-Directed NPC Actor System v2.0
 
 > **Production-grade AI system for augmented live-action events, powered by 8+ Google Cloud services.**
 
@@ -11,7 +11,7 @@ An intelligent NPC (Non-Player Character) direction system that generates person
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -40,7 +40,7 @@ An intelligent NPC (Non-Player Character) direction system that generates person
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## ☁️ Google Cloud Services Integration
+##  Google Cloud Services Integration
 
 | Service | Purpose | Integration Point |
 |---|---|---|
@@ -54,7 +54,7 @@ An intelligent NPC (Non-Player Character) direction system that generates person
 | **Google Cloud Build** | CI/CD pipeline for automated build and deployment | `cloudbuild.yaml` — Full pipeline |
 | **Google Container Registry** | Docker image storage and versioning | `cloudbuild.yaml` — Image management |
 
-## 🚀 Features
+##  Features
 
 ### Core System
 - **NFC Badge Scanning** — Scan → AI generation → Actor delivery in <2 seconds
@@ -78,7 +78,7 @@ An intelligent NPC (Non-Player Character) direction system that generates person
 - **Modular Router Architecture** — Separate route modules for attendees, characters, scanner, analytics
 - **Middleware Stack** — Security headers, rate limiting, request logging, error handling
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 npc-actor-system/
@@ -123,7 +123,7 @@ npc-actor-system/
 └── requirements.txt           # Python dependencies
 ```
 
-## 🛠️ Setup & Installation
+##  Setup & Installation
 
 ### Prerequisites
 - Python 3.11+
@@ -167,7 +167,7 @@ python -m uvicorn backend.app:app --reload --port 8080
 | `RATE_LIMIT_RPM` | No | 60 | Rate limit per minute |
 | `LOG_LEVEL` | No | INFO | Logging level |
 
-## 🧪 Testing
+##  Testing
 
 ```bash
 # Run all tests with coverage
@@ -186,7 +186,7 @@ ruff check backend/
 ruff format --check backend/
 ```
 
-## 🚢 Deployment (Google Cloud Run)
+##  Deployment (Google Cloud Run)
 
 ```bash
 # Option 1: Cloud Build (recommended)
@@ -201,7 +201,7 @@ gcloud run deploy npc-actor-system \
   --set-secrets GEMINI_API_KEY=GEMINI_API_KEY:latest
 ```
 
-## 📊 API Endpoints
+##  API Endpoints
 
 ### Core
 | Method | Endpoint | Description |
